@@ -14,19 +14,16 @@ import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.file.FlatFileItemReader;
-import org.springframework.batch.item.file.FlatFileParseException;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
-import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ResourceLoader;
 import org.springframework.core.io.UrlResource;
 
 import java.net.MalformedURLException;
 import java.util.List;
 
 /**
- * writer 에서 에러발생중.. 잡아야함 (콤마 개수가 안맞음)
+ * TODO : processor 에서 chunk 사이즈가 최대값이 되었을 때 평균구할 수 있도록 로직 추가필요
  */
 @Slf4j
 @Configuration
@@ -34,7 +31,7 @@ import java.util.List;
 public class StockAggregate {
     private final JobBuilderFactory jobBuilderFactory;
     private final StepBuilderFactory stepBuilderFactory;
-    private final ResourceLoader resourceLoader;
+    private final int chunkSize = 10;
 
     @Bean
     public Job stockAggregateJob() throws MalformedURLException {
@@ -47,10 +44,10 @@ public class StockAggregate {
     @Bean
     public Step stockAggregateStep() throws MalformedURLException {
         return stepBuilderFactory.get("stockAggregateStep")
-                .<StockVo, StockAggregateDto> chunk(10)
+                .<StockVo, StockAggregateDto> chunk(chunkSize)
                 .reader(stockAggregateJobReader())
                 .listener(new StockAggregateItemReaderListener())
-                .faultTolerant().skip(FlatFileParseException.class)
+//                .faultTolerant().skip(FlatFileParseException.class)
                 .processor(stockAggregateJobProcessor())
                 .writer(stockAggregateJobWriter())
                 .build();
@@ -62,13 +59,10 @@ public class StockAggregate {
 
         FlatFileItemReader<StockVo> reader = new FlatFileItemReaderBuilder<StockVo>()
                 .name("stockAggregateJobReader")
-                .fieldSetMapper(new BeanWrapperFieldSetMapper<>())
                 .targetType(StockVo.class)
                 .linesToSkip(1)
                 .delimited().delimiter(",")
-//                .names("Date", "Open", "High", "Low", "Close", "Volumn", "AdjOpen", "AdjHigh", "AdjLow", "AdjClose", "AdjVolumn")
-                .names("date", "open", "high", "low", "close", "volumn", "adjOpen", "adjHigh", "adjLow", "adjClose", "adjVolumn")
-
+                .names("date", "open", "high", "low", "close", "volumn", "adjOpen", "adjHigh", "adjLow")
                 .resource(urlResource)
                 .build();
         return reader;
@@ -78,9 +72,12 @@ public class StockAggregate {
     public ItemProcessor<StockVo, StockAggregateDto> stockAggregateJobProcessor() {
 
         ItemProcessor<StockVo, StockAggregateDto> itemProcessor = new ItemProcessor<>() {
+            StockAggregateDto stockAggregateDto = new StockAggregateDto();
+
             @Override
             public StockAggregateDto process(StockVo stockVo) throws Exception {
-                return null;
+                stockAggregateDto.setStock(stockVo);
+                return stockAggregateDto;
             }
         };
 
