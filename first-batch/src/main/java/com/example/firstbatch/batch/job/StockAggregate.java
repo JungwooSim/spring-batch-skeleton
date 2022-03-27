@@ -15,15 +15,17 @@ import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
+import org.springframework.batch.item.file.builder.FlatFileItemWriterBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.UrlResource;
 
 import java.net.MalformedURLException;
-import java.util.List;
 
 /**
  * TODO : processor 에서 chunk 사이즈가 최대값이 되었을 때 평균구할 수 있도록 로직 추가필요
+ * write 를 통해 파일 쓰는 작업은 완료
  */
 @Slf4j
 @Configuration
@@ -70,10 +72,9 @@ public class StockAggregate {
 
     @Bean
     public ItemProcessor<StockVo, StockAggregateDto> stockAggregateJobProcessor() {
+        StockAggregateDto stockAggregateDto = new StockAggregateDto();
 
         ItemProcessor<StockVo, StockAggregateDto> itemProcessor = new ItemProcessor<>() {
-            StockAggregateDto stockAggregateDto = new StockAggregateDto();
-
             @Override
             public StockAggregateDto process(StockVo stockVo) throws Exception {
                 stockAggregateDto.setStock(stockVo);
@@ -86,14 +87,13 @@ public class StockAggregate {
 
     @Bean
     public ItemWriter<StockAggregateDto> stockAggregateJobWriter() {
-        ItemWriter<StockAggregateDto> itemWriter = new ItemWriter<>() {
-            @Override
-            public void write(List<? extends StockAggregateDto> items) throws Exception {
-
-            }
-        };
-
-        return itemWriter;
+        return new FlatFileItemWriterBuilder<StockAggregateDto>()
+                .name("stockAggregateJobWriter")
+                .resource(new FileSystemResource("./data/stock/stockAggregateData.txt"))
+                .delimited()
+                .delimiter("|")
+                .names(new String[]{"openMin", "openMax", "openAverage"})
+                .build();
     }
 
 }
